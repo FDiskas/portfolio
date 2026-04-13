@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portfolio | FDiskas</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        dark: '#0f172a',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .loader {
+            border-top-color: #3b82f6;
+            animation: spinner 1.5s linear infinite;
+        }
+
+        @keyframes spinner {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body class="bg-slate-50 dark:bg-dark text-slate-900 dark:text-slate-100 transition-colors duration-300 min-h-screen">
+
+    <nav
+        class="sticky top-0 z-50 backdrop-blur-md bg-white/70 dark:bg-dark/70 border-b border-slate-200 dark:border-slate-800">
+        <div class="max-w-5xl mx-auto px-6 h-16 flex justify-between items-center">
+            <span id="nav-name" class="font-bold text-lg tracking-tight">Portfolio</span>
+            <button id="theme-toggle"
+                class="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors">
+                <span id="theme-icon"></span>
+            </button>
+        </div>
+    </nav>
+
+    <main class="max-w-5xl mx-auto px-6 py-12">
+        <section id="profile-section"
+            class="mb-16 flex flex-col md:flex-row items-center gap-8 opacity-0 transition-opacity duration-700">
+            <img id="avatar" src="" alt="Profile"
+                class="w-32 h-32 rounded-2xl shadow-xl ring-4 ring-white dark:ring-slate-800">
+            <div class="text-center md:text-left">
+                <h1 id="name" class="text-4xl font-extrabold mb-2 tracking-tight"></h1>
+                <p id="bio" class="text-xl text-slate-600 dark:text-slate-400 mb-4 max-w-2xl"></p>
+                <div class="flex flex-wrap justify-center md:justify-start gap-4" id="social-links"></div>
+            </div>
+        </section>
+
+        <section>
+            <div class="flex items-center gap-3 mb-8">
+                <h2 class="text-2xl font-bold">Featured Projects</h2>
+            </div>
+
+            <div id="loading" class="flex flex-col items-center py-20">
+                <div class="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-12 w-12 mb-4"></div>
+                <p class="text-slate-500">Fetching GitHub Repositories...</p>
+            </div>
+
+            <div id="projects-grid" class="grid grid-cols-1 md:grid-cols-2 gap-6"></div>
+        </section>
+    </main>
+
+    <script>
+        const themeToggle = document.getElementById('theme-toggle');
+        const themeIcon = document.getElementById('theme-icon');
+        const html = document.documentElement;
+
+        // --- Theme Logic ---
+        function setTheme(isDark) {
+            if (isDark) {
+                html.classList.add('dark');
+                themeIcon.innerHTML = '☀️';
+            } else {
+                html.classList.remove('dark');
+                themeIcon.innerHTML = '🌙';
+            }
+        }
+
+        // Detect OS preference
+        const osDark = window.matchMedia('(prefers-color-scheme: dark)');
+        setTheme(osDark.matches);
+
+        themeToggle.addEventListener('click', () => {
+            const isDark = html.classList.contains('dark');
+            setTheme(!isDark);
+        });
+
+        // --- Data Fetching ---
+        async function init() {
+            try {
+                const [profileRes, reposRes] = await Promise.all([
+                    fetch('https://api.github.com/users/FDiskas'),
+                    fetch('https://api.github.com/users/FDiskas/repos?per_page=100&sort=updated')
+                ]);
+
+                const profile = await profileRes.json();
+                const repos = await reposRes.json();
+
+                renderProfile(profile);
+                renderProjects(repos);
+            } catch (err) {
+                document.getElementById('loading').innerHTML = '<p class="text-red-500">Failed to load data.</p>';
+            }
+        }
+
+        function renderProfile(data) {
+            document.getElementById('nav-name').textContent = data.name || data.login;
+            document.getElementById('avatar').src = data.avatar_url;
+            document.getElementById('name').textContent = data.name;
+            document.getElementById('bio').textContent = data.bio;
+            document.getElementById('profile-section').style.opacity = '1';
+
+            const links = [
+                { label: 'GitHub', url: data.html_url },
+                { label: 'Website', url: data.blog }
+            ];
+
+            document.getElementById('social-links').innerHTML = links
+                .filter(l => l.url)
+                .map(l => `<a href="${l.url}" target="_blank" class="text-sm font-medium hover:text-blue-500 transition-colors underline decoration-2 underline-offset-4">${l.label}</a>`)
+                .join('');
+        }
+
+        function renderProjects(repos) {
+            const grid = document.getElementById('projects-grid');
+            const loading = document.getElementById('loading');
+
+            // Filter non-forks and sort by stars
+            const filtered = repos
+                .filter(r => !r.fork)
+                .sort((a, b) => b.stargazers_count - a.stargazers_count);
+
+            loading.style.display = 'none';
+
+            grid.innerHTML = filtered.map(repo => `
+                <a href="${repo.html_url}" target="_blank" class="group p-6 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-blue-500 dark:hover:border-blue-400 transition-all shadow-sm hover:shadow-md">
+                    <div class="flex justify-between items-start mb-3">
+                        <h3 class="font-bold text-lg group-hover:text-blue-500 transition-colors truncate">${repo.name}</h3>
+                        ${repo.stargazers_count > 0 ? `
+                            <div class="flex items-center gap-1 text-amber-500">
+                                <span class="text-xs font-bold">★ ${repo.stargazers_count}</span>
+                            </div>
+                        ` : ''}
+                    </div>
+                    <p class="text-sm text-slate-500 dark:text-slate-400 mb-6 line-clamp-2">
+                        ${repo.description || "No description provided."}
+                    </p>
+                    <div class="flex items-center gap-4 mt-auto">
+                        ${repo.language ? `<span class="text-[10px] font-mono px-2 py-0.5 bg-slate-100 dark:bg-slate-900 rounded text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">${repo.language}</span>` : ''}
+                        <span class="text-[10px] text-slate-400 uppercase font-semibold">Updated ${new Date(repo.updated_at).toLocaleDateString()}</span>
+                    </div>
+                </a>
+            `).join('');
+        }
+
+        init();
+    </script>
+</body>
+
+</html>
